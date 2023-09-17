@@ -24,7 +24,6 @@ import (
 	"golang.org/x/image/font"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
@@ -64,11 +63,6 @@ type Game struct {
 
 	state     GameState
 	menuState MenuState
-
-	audioContext *audio.Context
-	music        *Music
-
-	sounds map[string]*Sound
 }
 
 func main() {
@@ -95,19 +89,8 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 }
 
 func (g *Game) Init() error {
-	g.audioContext = audio.NewContext(audioSampleRate)
-
-	music, err := NewMusicFromFile(g.audioContext, "data/music/song.ogg")
+	err := g.loadMenuResources()
 	if err != nil {
-		return err
-	}
-	g.music = music
-
-	if err = g.loadSounds(); err != nil {
-		return err
-	}
-
-	if err = g.loadMenuResources(); err != nil {
 		return err
 	}
 
@@ -117,7 +100,6 @@ func (g *Game) Init() error {
 
 	// finally, start going
 	focus()
-	g.music.Play()
 	g.showMenu(MenuMain)
 	g.resetGame()
 
@@ -125,37 +107,7 @@ func (g *Game) Init() error {
 }
 
 func (g *Game) Exit() error {
-	if err := g.music.Close(); err != nil {
-		return err
-	}
-	for _, sound := range g.sounds {
-		if err := sound.Close(); err != nil {
-			return err
-		}
-	}
 	return nil
-}
-
-func (g *Game) loadSounds() error {
-	g.sounds = make(map[string]*Sound)
-	for _, soundName := range []string{
-		"ball_collision",
-		"ball_collision_paddle",
-		"ball_fall",
-	} {
-		s, err := NewSoundFromFile(g.audioContext, "data/sounds/"+soundName+".wav")
-		if err != nil {
-			return err
-		}
-		g.sounds[soundName] = s
-	}
-	return nil
-}
-
-func (g *Game) playSound(soundName string) {
-	if s, ok := g.sounds[soundName]; ok {
-		s.Play()
-	}
 }
 
 func (g *Game) loadObjects() error {
@@ -294,7 +246,6 @@ func (g *Game) onStartGame() {
 func (g *Game) launchBall() {
 	g.attachBallToPaddle = false
 	g.ball.Movement.Velocity = Vec2f{g.ball.Movement.Speed.X, -g.ball.Movement.Speed.Y}
-	g.playSound("ball_collision_paddle")
 	g.ball.updateFrame()
 }
 
@@ -349,7 +300,6 @@ func checkBallLost(ball *Ball, borderAABB FloatRect) bool {
 
 func (g *Game) onBallLost() {
 	// TODO: lives, etc.
-	g.playSound("ball_fall")
 	g.showMenu(MenuGameOver)
 }
 
@@ -365,10 +315,8 @@ func (g *Game) updateBall() {
 	}
 
 	collided := false
-	collidedWithPaddle := false
 	if handleBallPaddleCollision(g.ball, g.paddle) {
 		collided = true
-		collidedWithPaddle = true
 	}
 	if handleBallBlocksCollision(g.ball, g.blocks) {
 		collided = true
@@ -379,11 +327,6 @@ func (g *Game) updateBall() {
 
 	if collided {
 		g.ball.updateFrame()
-		if collidedWithPaddle {
-			g.playSound("ball_collision_paddle")
-		} else {
-			g.playSound("ball_collision")
-		}
 	}
 
 	t := g.ball.Transform
