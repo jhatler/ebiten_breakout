@@ -51,6 +51,7 @@ const (
 )
 
 type Game struct {
+	agent              *Agent
 	bg                 *Sprite
 	border             FloatRect
 	paddle             *Paddle
@@ -95,6 +96,11 @@ func (g *Game) Init() error {
 	}
 
 	if err = g.loadObjects(); err != nil {
+		return err
+	}
+
+	g.agent, err = makeAgent(g)
+	if err != nil {
 		return err
 	}
 
@@ -203,6 +209,11 @@ func (g *Game) setBallOnPaddle() {
 }
 
 func (g *Game) Update() error {
+	err := g.agent.Tick()
+	if err != nil {
+		return err
+	}
+
 	g.processInput()
 
 	if g.state == GameStatePlaying {
@@ -222,17 +233,33 @@ func (g *Game) processInput() {
 	case GameStateMenu:
 		if inpututil.IsKeyJustPressed(ebiten.KeyZ) {
 			g.onStartGame()
+		} else if inpututil.IsKeyJustPressed(ebiten.KeyQ) {
+			g.agent.Toggle()
+			g.onStartGame()
 		}
 	case GameStatePlaying:
-		stickState := GetStickState()
+		if inpututil.IsKeyJustPressed(ebiten.KeyQ) {
+			g.agent.Toggle()
+		}
+
+		if inpututil.IsKeyJustPressed(ebiten.KeyE) {
+			g.agent.NextAlgo()
+		}
+
+		stickState := Vec2f{}
+
+		if g.agent.active {
+			stickState = g.agent.GetStickState()
+		} else {
+			stickState = GetStickState()
+		}
+
 		p := g.paddle
 		p.Movement.Velocity.X = stickState.X * p.Movement.Speed.X
 
-		if g.attachBallToPaddle {
-			if inpututil.IsKeyJustPressed(ebiten.KeyW) {
-				g.state = GameStatePlaying
-				g.launchBall()
-			}
+		if g.attachBallToPaddle && stickState.Y == -1 {
+			g.state = GameStatePlaying
+			g.launchBall()
 		}
 	}
 }
@@ -299,8 +326,12 @@ func checkBallLost(ball *Ball, borderAABB FloatRect) bool {
 }
 
 func (g *Game) onBallLost() {
-	// TODO: lives, etc.
-	g.showMenu(MenuGameOver)
+	if g.agent.active {
+		g.agent.Lose()
+		g.onStartGame()
+	} else {
+		g.showMenu(MenuGameOver)
+	}
 }
 
 func (g *Game) updateBall() {
@@ -427,7 +458,12 @@ func (g *Game) onGameWin() {
 	g.ball.Movement.Velocity = Vec2f{}
 	g.paddle.Movement.Velocity = Vec2f{}
 
-	g.showMenu(MenuWin)
+	if g.agent.active {
+		g.agent.Win()
+		g.onStartGame()
+	} else {
+		g.showMenu(MenuWin)
+	}
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
@@ -443,6 +479,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	g.paddle.Draw(screen)
 	g.ball.Draw(screen)
+
+	if g.agent.active {
+		g.drawStatus(screen, g.agent)
+	}
 
 	if g.state == GameStateMenu {
 		g.drawMenu(screen)

@@ -15,6 +15,7 @@
 package main
 
 import (
+	"fmt"
 	"image/color"
 	"io"
 	"log"
@@ -53,9 +54,9 @@ type textItem struct {
 
 var mainMenuTexts = []textItem{
 	{"Ebiten Breakout", dbPos.Y + 18, textRedColor},
-	{"Press Z to play", dbPos.Y + 34, textNormalColor},
-	{"W - launch ball", dbPos.Y + 50, textNormalColor},
-	{"A/D - move", dbPos.Y + 66, textNormalColor},
+	{"Z/Q - play/auto", dbPos.Y + 34, textNormalColor},
+	{"W/A/D - move", dbPos.Y + 50, textNormalColor},
+	{"E - next algo", dbPos.Y + 66, textNormalColor},
 	{"2021, Elias Daler", 236, textNormalColor},
 }
 
@@ -135,4 +136,12 @@ func (g *Game) drawMenu(screen *ebiten.Image) {
 	for _, ti := range texts {
 		text.Draw(screen, ti.text, g.font, gameScreenWidth/2.-len(ti.text)/2.*fontSize, ti.posY, ti.color)
 	}
+}
+
+func (g *Game) drawStatus(screen *ebiten.Image, agent *Agent) {
+	status := fmt.Sprintf("%d wins / %d runs", agent.wins, agent.runs)
+	ticks := fmt.Sprintf("T: %05d", agent.ticks)
+
+	text.Draw(screen, status, g.font, 30, 14, textNormalColor)
+	text.Draw(screen, ticks, g.font, gameScreenWidth-len(ticks)*fontSize, 14, textNormalColor)
 }
