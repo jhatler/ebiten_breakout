@@ -16,6 +16,7 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"image/color"
 	_ "image/png"
 	"log"
@@ -25,6 +26,9 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
+
+	tf "github.com/wamuir/graft/tensorflow"
+	op "github.com/wamuir/graft/tensorflow/op"
 )
 
 //go:embed data
@@ -74,6 +78,25 @@ func main() {
 	ebiten.SetWindowSize(windowWidth, windowHeight)
 	ebiten.SetWindowTitle("Ebiten Breakout")
 	ebiten.SetWindowResizable(false)
+
+	// Construct a graph with an operation that produces a string constant.
+	s := op.NewScope()
+	c := op.Const(s, "Hello from TensorFlow version "+tf.Version())
+	graph, err := s.Finalize()
+	if err != nil {
+		panic(err)
+	}
+
+	// Execute the graph in a session.
+	sess, err := tf.NewSession(graph, nil)
+	if err != nil {
+		panic(err)
+	}
+	output, err := sess.Run(nil, []tf.Output{c}, nil)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(output[0].Value())
 
 	if err := ebiten.RunGame(g); err != nil {
 		log.Fatal(err)
